@@ -39,14 +39,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        "Halo! Aku Tiffany Bot 🤖\nPilih opsi atau gunakan perintah biasa:\n"
-        "• Terjemahan: /translate <kode_bahasa>\n"
-        "• OCR: kirim foto saja\n"
-        "• Buat QRIS: /qris <teks>\n"
-        "• Hapus Latar Belakang: /hapus\n"
-        "• Lihat kode bahasa: /help",
-        reply_markup=reply_markup
-    )
+    """Halo! Aku Tiffany Bot 🤖
+Aku bisa bantu:
+• Terjemahan: /translate <kode_bahasa>
+• OCR: kirim foto saja
+• Buat QRIS: /qris <teks>
+• Hapus Latar Belakang: /hapus
+• Lihat kode bahasa: /help""",
+    reply_markup=reply_markup
+)
+
 
 # === /help ===
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
