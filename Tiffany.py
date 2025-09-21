@@ -99,6 +99,7 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     app.run_polling()
-
+    
+pytesseract.pytesseract.tesseract_cmd = "tesseract"
 if __name__ == "__main__":
     main()
