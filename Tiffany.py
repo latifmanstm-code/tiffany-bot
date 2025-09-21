@@ -2,6 +2,8 @@ import os
 import logging
 import pytesseract
 from PIL import Image
+from io import BytesIO
+import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -14,15 +16,9 @@ from telegram.ext import (
 from deep_translator import GoogleTranslator
 import qrcode
 
-# Cek apakah rembg tersedia
-try:
-    from rembg import remove
-except ModuleNotFoundError:
-    remove = None
-    print("⚠️ Module 'onnxruntime' tidak ditemukan! Fitur hapus background tidak aktif.")
-
 # === Konfigurasi ===
 BOT_TOKEN = "7987228573:AAHRXIGXSV3pUHoxeniHnMQQgS2RxPKEXAk"
+REMOVE_BG_API_KEY = "cQdGptgkFQbVpQXETxCJ1AMv"
 pytesseract.pytesseract.tesseract_cmd = "tesseract"
 
 # === Logging ===
@@ -39,15 +35,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        """Halo! Aku Tiffany Bot 🤖
+    """Halo! Aku Tiffany Bot 🤖
 Aku bisa bantu:
 • Terjemahan: /translate <kode_bahasa>
 • OCR: kirim foto saja
 • Buat QRIS: /qris <teks>
 • Hapus Latar Belakang: /hapus
 • Lihat kode bahasa: /help""",
-        reply_markup=reply_markup
-    )
+    reply_markup=reply_markup
+)
 
 # === /help ===
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -94,23 +90,30 @@ async def ocr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     finally:
         if os.path.exists(path): os.remove(path)
 
-# === Hapus Background ===
+# === Hapus Background via remove.bg API ===
 async def hapus_bg(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if remove is None:
-        await update.message.reply_text("⚠️ Fitur hapus background tidak tersedia. Install 'onnxruntime' dengan: pip install rembg[onnx]")
-        return
     if not update.message.photo:
         await update.message.reply_text("📸 Kirim foto untuk dihapus background-nya.")
         return
+
     file = await update.message.photo[-1].get_file()
     path = await file.download_to_drive()
     out_path = "no_bg.png"
     try:
-        input_image = Image.open(path)
-        output_image = remove(input_image)
-        output_image.save(out_path)
-        with open(out_path, "rb") as out_file:
-            await update.message.reply_photo(photo=out_file, caption="✅ Background berhasil dihapus!")
+        with open(path, "rb") as img_file:
+            response = requests.post(
+                "https://api.remove.bg/v1.0/removebg",
+                files={"image_file": img_file},
+                data={"size": "auto"},
+                headers={"X-Api-Key": REMOVE_BG_API_KEY},
+            )
+        if response.status_code == 200:
+            with open(out_path, "wb") as out_file:
+                out_file.write(response.content)
+            with open(out_path, "rb") as out_file:
+                await update.message.reply_photo(photo=out_file, caption="✅ Background berhasil dihapus!")
+        else:
+            await update.message.reply_text(f"⚠️ Gagal hapus background: {response.text}")
     except Exception as e:
         await update.message.reply_text(f"⚠️ Error hapus background: {e}")
     finally:
@@ -118,9 +121,11 @@ async def hapus_bg(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(out_path): os.remove(out_path)
 
 # === Buat QRIS ===
-async def buat_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def buat_qr_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        await update.message.reply_text("Kirim teks / alamat / email untuk dibuat QRIS.\nContoh: /qris https://example.com")
+        await update.message.reply_text(
+            "Kirim teks / alamat / email untuk dibuat QRIS.\nContoh: /qris https://example.com"
+        )
         return
     data = " ".join(context.args)
     out_path = "qris.png"
@@ -130,12 +135,12 @@ async def buat_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         qr.make(fit=True)
         img = qr.make_image(fill='black', back_color='white')
         img.save(out_path)
-        with open(out_path, "rb") as out_file:
-            await update.message.reply_photo(photo=out_file, caption="✅ QRIS berhasil dibuat!")
+        await update.message.reply_photo(photo=open(out_path, "rb"), caption="✅ QRIS berhasil dibuat!")
     except Exception as e:
         await update.message.reply_text(f"⚠️ Error membuat QRIS: {e}")
     finally:
         if os.path.exists(out_path): os.remove(out_path)
+
 
 # === Handler Foto Berdasarkan Mode ===
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
