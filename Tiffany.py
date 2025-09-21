@@ -13,7 +13,13 @@ from telegram.ext import (
 )
 from deep_translator import GoogleTranslator
 import qrcode
-from rembg import remove
+
+# Cek apakah onnxruntime tersedia
+try:
+    from rembg import remove
+except ModuleNotFoundError:
+    print("⚠️ Module 'onnxruntime' tidak ditemukan! Install dengan 'pip install rembg[onnx]'")
+    raise
 
 # === Konfigurasi ===
 BOT_TOKEN = "7987228573:AAHRXIGXSV3pUHoxeniHnMQQgS2RxPKEXAk"
@@ -150,8 +156,8 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("translate", translate_cmd))
-    app.add_handler(CommandHandler("qris", buat_qr_cmd))       # <-- handler /qris
-    app.add_handler(CommandHandler("hapus", hapus_bg_cmd))    # <-- handler /hapus
+    app.add_handler(CommandHandler("qris", buat_qr_cmd))
+    app.add_handler(CommandHandler("hapus", hapus_bg_cmd))
     app.add_handler(MessageHandler(filters.PHOTO, ocr))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(CallbackQueryHandler(button_callback))
