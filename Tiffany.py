@@ -91,34 +91,42 @@ async def ocr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(path): os.remove(path)
 
 # === Hapus Background via remove.bg API ===
-async def hapus_bg(update: Update, context: ContextTypes.DEFAULT_TYPE):
+REMOVE_BG_API_KEY = "cQdGptgkFQbVpQXETxCJ1AMv"
+
+async def hapus_bg_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.photo:
         await update.message.reply_text("📸 Kirim foto untuk dihapus background-nya.")
         return
 
     file = await update.message.photo[-1].get_file()
     path = await file.download_to_drive()
-    out_path = "no_bg.png"
+
     try:
-        with open(path, "rb") as img_file:
+        with open(path, "rb") as f:
             response = requests.post(
                 "https://api.remove.bg/v1.0/removebg",
-                files={"image_file": img_file},
+                files={"image_file": f},
                 data={"size": "auto"},
                 headers={"X-Api-Key": REMOVE_BG_API_KEY},
             )
+
         if response.status_code == 200:
-            with open(out_path, "wb") as out_file:
-                out_file.write(response.content)
-            with open(out_path, "rb") as out_file:
-                await update.message.reply_photo(photo=out_file, caption="✅ Background berhasil dihapus!")
+            await update.message.reply_photo(
+                photo=BytesIO(response.content),
+                caption="✅ Background berhasil dihapus!"
+            )
         else:
-            await update.message.reply_text(f"⚠️ Gagal hapus background: {response.text}")
+            await update.message.reply_text(
+                f"⚠️ Gagal menghapus background. Status code: {response.status_code}"
+            )
+
     except Exception as e:
         await update.message.reply_text(f"⚠️ Error hapus background: {e}")
+
     finally:
-        if os.path.exists(path): os.remove(path)
-        if os.path.exists(out_path): os.remove(out_path)
+        if os.path.exists(path):
+            os.remove(path)
+
 
 # === Buat QRIS ===
 async def buat_qr_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
