@@ -2,18 +2,22 @@ import os
 import logging
 import pytesseract
 from PIL import Image
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     ContextTypes,
     filters,
 )
 from deep_translator import GoogleTranslator
+import qrcode
+from rembg import remove
 
 # === Konfigurasi ===
 BOT_TOKEN = "7987228573:AAHRXIGXSV3pUHoxeniHnMQQgS2RxPKEXAk"
+pytesseract.pytesseract.tesseract_cmd = "tesseract"
 
 # === Logging ===
 logging.basicConfig(
@@ -22,12 +26,18 @@ logging.basicConfig(
 
 # === /start ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [InlineKeyboardButton("Gambar Menjadi Tulisan", callback_data='ocr')],
+        [InlineKeyboardButton("Hapus Latar Belakang", callback_data='remove_bg')],
+        [InlineKeyboardButton("Buat QRIS", callback_data='buat_qr')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        "Halo! Aku Tiffany Bot 🤖\n\n"
-        "Aku bisa bantu:\n"
+        "Halo! Aku Tiffany Bot 🤖\nPilih opsi atau gunakan perintah biasa:\n"
         "• Terjemahan: /translate <kode_bahasa>\n"
         "• OCR: kirim foto saja\n"
-        "• Lihat kode bahasa: /help"
+        "• Lihat kode bahasa: /help",
+        reply_markup=reply_markup
     )
 
 # === /help ===
@@ -54,28 +64,57 @@ async def translate_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("Contoh: /translate en\n(untuk terjemah ke Inggris)")
         return
-
     target_lang = context.args[0].lower()
     context.user_data["translate_lang"] = target_lang
-    await update.message.reply_text(f"✅ Mode terjemahan diaktifkan: {target_lang.upper()}.\n"
-                                    f"Kirim teks apa saja untuk diterjemahkan.")
+    await update.message.reply_text(f"✅ Mode terjemahan diaktifkan: {target_lang.upper()}.\nKirim teks apa saja untuk diterjemahkan.")
 
 # === OCR otomatis saat kirim foto ===
 async def ocr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file = await update.message.photo[-1].get_file()
     path = await file.download_to_drive()
-
     try:
-        if os.path.exists(path) and os.access(path, os.R_OK):
-            img = Image.open(path)
-            text = pytesseract.image_to_string(img)
-            await update.message.reply_text("📄 Hasil OCR:\n\n" + (text.strip() or "❌ Tidak ada teks terbaca."))
-        else:
-            await update.message.reply_text("⚠️ File tidak bisa diakses: " + path)
+        img = Image.open(path)
+        text = pytesseract.image_to_string(img)
+        await update.message.reply_text("📄 Hasil OCR:\n\n" + (text.strip() or "❌ Tidak ada teks terbaca."))
     except Exception as e:
         await update.message.reply_text(f"⚠️ Error OCR: {e}")
     finally:
         if os.path.exists(path): os.remove(path)
+
+# === Hapus Background Gambar ===
+async def hapus_bg(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    file = await update.message.photo[-1].get_file()
+    path = await file.download_to_drive()
+    out_path = "no_bg.png"
+    try:
+        input_image = Image.open(path)
+        output_image = remove(input_image)
+        output_image.save(out_path)
+        await update.message.reply_photo(photo=open(out_path, "rb"), caption="✅ Background berhasil dihapus!")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ Error hapus background: {e}")
+    finally:
+        if os.path.exists(path): os.remove(path)
+        if os.path.exists(out_path): os.remove(out_path)
+
+# === Buat QRIS dari teks ===
+async def buat_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Kirim teks / alamat / email untuk dibuat QRIS.\nContoh: /buat_qris https://example.com")
+        return
+    data = " ".join(context.args)
+    out_path = "qris.png"
+    try:
+        qr = qrcode.QRCode(version=1, box_size=10, border=5)
+        qr.add_data(data)
+        qr.make(fit=True)
+        img = qr.make_image(fill='black', back_color='white')
+        img.save(out_path)
+        await update.message.reply_photo(photo=open(out_path, "rb"), caption="✅ QRIS berhasil dibuat!")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ Error membuat QRIS: {e}")
+    finally:
+        if os.path.exists(out_path): os.remove(out_path)
 
 # === Teks biasa ===
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -88,18 +127,28 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logging.error(f"Translate error: {e}")
             await update.message.reply_text("⚠️ Terjadi kesalahan saat menerjemahkan.")
 
+# === Callback tombol ===
+async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if query.data == "ocr":
+        await query.message.reply_text("📸 Kirim foto untuk diubah menjadi teks.")
+    elif query.data == "remove_bg":
+        await query.message.reply_text("📸 Kirim foto untuk dihapus background-nya.")
+    elif query.data == "buat_qr":
+        await query.message.reply_text("✏️ Kirim teks / link / alamat untuk dibuat QRIS.")
+
 # === Main ===
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
-
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("translate", translate_cmd))
+    app.add_handler(CommandHandler("buat_qris", buat_qr))
     app.add_handler(MessageHandler(filters.PHOTO, ocr))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-
+    app.add_handler(CallbackQueryHandler(button_callback))
     app.run_polling()
-    
-pytesseract.pytesseract.tesseract_cmd = "tesseract"
+
 if __name__ == "__main__":
     main()
