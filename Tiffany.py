@@ -95,24 +95,44 @@ async def ocr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # === Hapus Background Gambar ===
 async def hapus_bg_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if remove is None:
-        await update.message.reply_text("⚠️ Fitur hapus background tidak tersedia. Install 'onnxruntime' dengan 'pip install rembg[onnx]'.")
+        await update.message.reply_text(
+            "⚠️ Fitur hapus background tidak tersedia. "
+            "Install 'onnxruntime' dengan:\n`pip install rembg[onnx]`"
+        )
         return
+
     if not update.message.photo:
         await update.message.reply_text("📸 Kirim foto untuk dihapus background-nya.")
         return
+
     file = await update.message.photo[-1].get_file()
     path = await file.download_to_drive()
     out_path = "no_bg.png"
+
     try:
+        # Buka gambar
         input_image = Image.open(path)
+        # Hapus background
         output_image = remove(input_image)
+        # Simpan hasil
         output_image.save(out_path)
-        await update.message.reply_photo(photo=open(out_path, "rb"), caption="✅ Background berhasil dihapus!")
+
+        # Kirim hasil ke Telegram
+        with open(out_path, "rb") as out_file:
+            await update.message.reply_photo(
+                photo=out_file,
+                caption="✅ Background berhasil dihapus!"
+            )
+
     except Exception as e:
         await update.message.reply_text(f"⚠️ Error hapus background: {e}")
+
     finally:
-        if os.path.exists(path): os.remove(path)
-        if os.path.exists(out_path): os.remove(out_path)
+        # Hapus file sementara
+        if os.path.exists(path):
+            os.remove(path)
+        if os.path.exists(out_path):
+            os.remove(out_path)
 
 # === Buat QRIS dari teks ===
 async def buat_qr_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
