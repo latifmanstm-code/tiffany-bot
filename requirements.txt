@@ -2,3 +2,5 @@ python-telegram-bot==20.3
 pillow
 pytesseract
 deep-translator
+rembg[onnx]
+qrcode
