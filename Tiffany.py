@@ -36,6 +36,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Halo! Aku Tiffany Bot 🤖\nPilih opsi atau gunakan perintah biasa:\n"
         "• Terjemahan: /translate <kode_bahasa>\n"
         "• OCR: kirim foto saja\n"
+        "• Buat QRIS: /qris <teks>\n"
+        "• Hapus Latar Belakang: /hapus\n"
         "• Lihat kode bahasa: /help",
         reply_markup=reply_markup
     )
@@ -55,7 +57,8 @@ zh-tw = Chinese (Traditional)
 📌 Contoh:
 /translate id
 /translate en
-/translate ja
+/qris https://example.com
+/hapus
 '''
     await update.message.reply_text(daftar)
 
@@ -82,7 +85,10 @@ async def ocr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(path): os.remove(path)
 
 # === Hapus Background Gambar ===
-async def hapus_bg(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def hapus_bg_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message.photo:
+        await update.message.reply_text("📸 Kirim foto untuk dihapus background-nya.")
+        return
     file = await update.message.photo[-1].get_file()
     path = await file.download_to_drive()
     out_path = "no_bg.png"
@@ -98,9 +104,9 @@ async def hapus_bg(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(out_path): os.remove(out_path)
 
 # === Buat QRIS dari teks ===
-async def buat_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def buat_qr_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        await update.message.reply_text("Kirim teks / alamat / email untuk dibuat QRIS.\nContoh: /buat_qris https://example.com")
+        await update.message.reply_text("Kirim teks / alamat / email untuk dibuat QRIS.\nContoh: /qris https://example.com")
         return
     data = " ".join(context.args)
     out_path = "qris.png"
@@ -144,7 +150,8 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("translate", translate_cmd))
-    app.add_handler(CommandHandler("buat_qris", buat_qr))
+    app.add_handler(CommandHandler("qris", buat_qr_cmd))       # <-- handler /qris
+    app.add_handler(CommandHandler("hapus", hapus_bg_cmd))    # <-- handler /hapus
     app.add_handler(MessageHandler(filters.PHOTO, ocr))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(CallbackQueryHandler(button_callback))
