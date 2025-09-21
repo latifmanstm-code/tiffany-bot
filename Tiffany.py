@@ -14,7 +14,6 @@ from deep_translator import GoogleTranslator
 
 # === Konfigurasi ===
 BOT_TOKEN = "7987228573:AAHRXIGXSV3pUHoxeniHnMQQgS2RxPKEXAk"
-pytesseract.pytesseract.tesseract_cmd = "/data/data/com.termux/files/usr/bin/tesseract"
 
 # === Logging ===
 logging.basicConfig(
