@@ -19,7 +19,7 @@ try:
     from rembg import remove
 except ModuleNotFoundError:
     print("⚠️ Module 'onnxruntime' tidak ditemukan! Install dengan 'pip install rembg[onnx]'")
-    raise
+    remove = None  # agar bot tetap jalan untuk fitur lain
 
 # === Konfigurasi ===
 BOT_TOKEN = "7987228573:AAHRXIGXSV3pUHoxeniHnMQQgS2RxPKEXAk"
@@ -92,6 +92,9 @@ async def ocr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # === Hapus Background Gambar ===
 async def hapus_bg_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if remove is None:
+        await update.message.reply_text("⚠️ Fitur hapus background tidak tersedia. Install 'onnxruntime' dengan 'pip install rembg[onnx]'.")
+        return
     if not update.message.photo:
         await update.message.reply_text("📸 Kirim foto untuk dihapus background-nya.")
         return
