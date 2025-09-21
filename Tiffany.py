@@ -14,7 +14,7 @@ from telegram.ext import (
 from deep_translator import GoogleTranslator
 import qrcode
 
-# Cek apakah onnxruntime tersedia
+# Cek apakah onnxruntime tersedia untuk rembg
 try:
     from rembg import remove
 except ModuleNotFoundError:
@@ -49,7 +49,6 @@ Aku bisa bantu:
     reply_markup=reply_markup
 )
 
-
 # === /help ===
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     daftar = '''
@@ -79,7 +78,7 @@ async def translate_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["translate_lang"] = target_lang
     await update.message.reply_text(f"✅ Mode terjemahan diaktifkan: {target_lang.upper()}.\nKirim teks apa saja untuk diterjemahkan.")
 
-# === OCR otomatis saat kirim foto ===
+# === OCR ===
 async def ocr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file = await update.message.photo[-1].get_file()
     path = await file.download_to_drive()
@@ -92,49 +91,29 @@ async def ocr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     finally:
         if os.path.exists(path): os.remove(path)
 
-# === Hapus Background Gambar ===
+# === Hapus Background ===
 async def hapus_bg_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if remove is None:
         await update.message.reply_text(
-            "⚠️ Fitur hapus background tidak tersedia. "
-            "Install 'onnxruntime' dengan:\n`pip install rembg[onnx]`"
+            "⚠️ Fitur hapus background tidak tersedia. Install 'onnxruntime' dengan:\n`pip install rembg[onnx]`"
         )
         return
-
-    if not update.message.photo:
-        await update.message.reply_text("📸 Kirim foto untuk dihapus background-nya.")
-        return
-
     file = await update.message.photo[-1].get_file()
     path = await file.download_to_drive()
     out_path = "no_bg.png"
-
     try:
-        # Buka gambar
         input_image = Image.open(path)
-        # Hapus background
         output_image = remove(input_image)
-        # Simpan hasil
         output_image.save(out_path)
-
-        # Kirim hasil ke Telegram
         with open(out_path, "rb") as out_file:
-            await update.message.reply_photo(
-                photo=out_file,
-                caption="✅ Background berhasil dihapus!"
-            )
-
+            await update.message.reply_photo(photo=out_file, caption="✅ Background berhasil dihapus!")
     except Exception as e:
         await update.message.reply_text(f"⚠️ Error hapus background: {e}")
-
     finally:
-        # Hapus file sementara
-        if os.path.exists(path):
-            os.remove(path)
-        if os.path.exists(out_path):
-            os.remove(out_path)
+        if os.path.exists(path): os.remove(path)
+        if os.path.exists(out_path): os.remove(out_path)
 
-# === Buat QRIS dari teks ===
+# === Buat QRIS ===
 async def buat_qr_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("Kirim teks / alamat / email untuk dibuat QRIS.\nContoh: /qris https://example.com")
@@ -169,11 +148,21 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     if query.data == "ocr":
+        context.user_data["mode"] = "ocr"
         await query.message.reply_text("📸 Kirim foto untuk diubah menjadi teks.")
     elif query.data == "remove_bg":
+        context.user_data["mode"] = "remove_bg"
         await query.message.reply_text("📸 Kirim foto untuk dihapus background-nya.")
     elif query.data == "buat_qr":
         await query.message.reply_text("✏️ Kirim teks / link / alamat untuk dibuat QRIS.")
+
+# === Handler foto berdasarkan mode ===
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    mode = context.user_data.get("mode", "ocr")  # default ke OCR
+    if mode == "ocr":
+        await ocr(update, context)
+    elif mode == "remove_bg":
+        await hapus_bg_cmd(update, context)
 
 # === Main ===
 def main():
@@ -183,7 +172,7 @@ def main():
     app.add_handler(CommandHandler("translate", translate_cmd))
     app.add_handler(CommandHandler("qris", buat_qr_cmd))
     app.add_handler(CommandHandler("hapus", hapus_bg_cmd))
-    app.add_handler(MessageHandler(filters.PHOTO, ocr))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(CallbackQueryHandler(button_callback))
     app.run_polling()
