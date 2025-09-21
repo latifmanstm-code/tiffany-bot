@@ -13,7 +13,13 @@ from telegram.ext import (
 )
 from deep_translator import GoogleTranslator
 import qrcode
-from rembg import remove  # pastikan rembg[onnx] sudah diinstall
+
+# Cek apakah rembg tersedia
+try:
+    from rembg import remove
+except ModuleNotFoundError:
+    remove = None
+    print("⚠️ Module 'onnxruntime' tidak ditemukan! Fitur hapus background tidak aktif.")
 
 # === Konfigurasi ===
 BOT_TOKEN = "7987228573:AAHRXIGXSV3pUHoxeniHnMQQgS2RxPKEXAk"
@@ -28,7 +34,7 @@ logging.basicConfig(
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("Gambar Menjadi Tulisan", callback_data='ocr')],
-        [InlineKeyboardButton("Hapus Latar Belakang", callback_data='remove_bg')],
+        [InlineKeyboardButton("Hapus Latar Belakang", callback_data='hapus_bg')],
         [InlineKeyboardButton("Buat QRIS", callback_data='buat_qr')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -72,7 +78,7 @@ async def translate_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["translate_lang"] = target_lang
     await update.message.reply_text(f"✅ Mode terjemahan diaktifkan: {target_lang.upper()}.\nKirim teks apa saja untuk diterjemahkan.")
 
-# === OCR otomatis saat kirim foto ===
+# === OCR ===
 async def ocr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.photo:
         await update.message.reply_text("📸 Kirim foto untuk diubah menjadi teks.")
@@ -88,8 +94,11 @@ async def ocr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     finally:
         if os.path.exists(path): os.remove(path)
 
-# === Hapus Background Gambar ===
-async def hapus_bg_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# === Hapus Background ===
+async def hapus_bg(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if remove is None:
+        await update.message.reply_text("⚠️ Fitur hapus background tidak tersedia. Install 'onnxruntime' dengan: pip install rembg[onnx]")
+        return
     if not update.message.photo:
         await update.message.reply_text("📸 Kirim foto untuk dihapus background-nya.")
         return
@@ -108,8 +117,8 @@ async def hapus_bg_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(path): os.remove(path)
         if os.path.exists(out_path): os.remove(out_path)
 
-# === Buat QRIS dari teks ===
-async def buat_qr_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# === Buat QRIS ===
+async def buat_qr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("Kirim teks / alamat / email untuk dibuat QRIS.\nContoh: /qris https://example.com")
         return
@@ -128,7 +137,17 @@ async def buat_qr_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     finally:
         if os.path.exists(out_path): os.remove(out_path)
 
-# === Teks biasa ===
+# === Handler Foto Berdasarkan Mode ===
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    mode = context.user_data.get("mode")
+    if mode == "ocr":
+        await ocr(update, context)
+    elif mode == "hapus_bg":
+        await hapus_bg(update, context)
+    else:
+        await update.message.reply_text("📸 Tekan tombol terlebih dahulu sebelum kirim foto.")
+
+# === Handler Teks ===
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target_lang = context.user_data.get("translate_lang")
     if target_lang:
@@ -139,15 +158,18 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logging.error(f"Translate error: {e}")
             await update.message.reply_text("⚠️ Terjadi kesalahan saat menerjemahkan.")
 
-# === Callback tombol ===
+# === Callback Tombol ===
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     if query.data == "ocr":
+        context.user_data["mode"] = "ocr"
         await query.message.reply_text("📸 Kirim foto untuk diubah menjadi teks.")
-    elif query.data == "remove_bg":
+    elif query.data == "hapus_bg":
+        context.user_data["mode"] = "hapus_bg"
         await query.message.reply_text("📸 Kirim foto untuk dihapus background-nya.")
     elif query.data == "buat_qr":
+        context.user_data["mode"] = None
         await query.message.reply_text("✏️ Kirim teks / link / alamat untuk dibuat QRIS.")
 
 # === Main ===
@@ -156,9 +178,9 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("translate", translate_cmd))
-    app.add_handler(CommandHandler("qris", buat_qr_cmd))
-    app.add_handler(CommandHandler("hapus", hapus_bg_cmd))
-    app.add_handler(MessageHandler(filters.PHOTO, ocr))
+    app.add_handler(CommandHandler("qris", buat_qr))
+    app.add_handler(CommandHandler("hapus", hapus_bg))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(CallbackQueryHandler(button_callback))
     app.run_polling()
