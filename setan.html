@@ -1,14 +1,90 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
-  <meta http-equiv="refresh" content="0; url=setan.html">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DuitCuan</title>
+  <style>
+    body { background: #222; color: white; font-family: Arial, sans-serif; text-align: center; padding: 30px; }
+    h1 { color: yellow; }
+    .saldo { font-size: 24px; margin: 20px 0; }
+    button { 
+      display: block;
+      width: 90%;
+      margin: 10px auto;
+      padding: 15px;
+      font-size: 18px;
+      background: green;
+      color: white;
+      border: none;
+      border-radius: 10px;
+    }
+    .btn-red { background: red; }
+    .iklan-box {
+      margin: 20px auto;
+      padding: 10px;
+      background: #333;
+      border-radius: 10px;
+    }
+  </style>
 </head>
 <body>
-  <p>Jika tidak otomatis pindah, klik <a href="setan.html">di sini</a>.</p>
-</body>
-</html>  <h1>👻 Selamat datang di Halaman Setan</h1>
-  <p>Ini hanya contoh halaman untuk uji coba di GitHub Pages.</p>
-  <a href="index.html">Kembali ke Halaman Utama</a>
+  <h1>💰 DuitCuan</h1>
+  <p>Aplikasi nonton iklan & dapat saldo</p>
+  <div class="saldo">Saldo: Rp <span id="saldo">0</span></div>
+
+  <!-- Slot iklan -->
+  <div class="iklan-box">
+    <p>🎬 Iklan tampil di sini</p>
+    <!-- Contoh Google AdSense -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+    <ins class="adsbygoogle"
+         style="display:block"
+         data-ad-client="ca-pub-XXXXXXXXXXXXXXXX" 
+         data-ad-slot="YYYYYYYYYY" 
+         data-ad-format="auto"
+         data-full-width-responsive="true"></ins>
+    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+  </div>
+
+  <!-- Tombol aksi -->
+  <button onclick="tontonIklan()">🎬 Tonton Iklan (+Rp500)</button>
+  <button onclick="undangTeman()">👥 Ajak Teman (+Rp2000)</button>
+  <button class="btn-red" onclick="tarik()">💳 Tarik Uang</button>
+
+  <script>
+    // Load saldo dari localStorage
+    let saldo = localStorage.getItem("saldo") ? parseInt(localStorage.getItem("saldo")) : 0;
+    document.getElementById("saldo").innerText = saldo;
+
+    function updateSaldo(jumlah){
+      saldo += jumlah;
+      localStorage.setItem("saldo", saldo);
+      document.getElementById("saldo").innerText = saldo;
+    }
+
+    function tontonIklan(){
+      alert("Silakan tonton iklan dulu, setelah iklan selesai saldo bertambah Rp500.");
+      updateSaldo(500);
+    }
+
+    function undangTeman(){
+      const link = "https://latifmanstm-code.github.io/tiffany-bot/setan.html";
+      navigator.clipboard.writeText(link);
+      alert("Link referral disalin:\n" + link + "\n+Rp2000 saldo ditambahkan!");
+      updateSaldo(2000);
+    }
+
+    function tarik(){
+      if(saldo >= 1000){
+        alert("✅ Penarikan berhasil! (Simulasi). Saldo direset.");
+        saldo = 0;
+        localStorage.setItem("saldo", saldo);
+        document.getElementById("saldo").innerText = saldo;
+      } else {
+        alert("❌ Minimal penarikan Rp 1.000. Saldo Anda Rp " + saldo);
+      }
+    }
+  </script>
 </body>
 </html>
- 
